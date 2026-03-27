@@ -12,26 +12,44 @@ import { Sparkles, MapPin, Calendar, Clock } from "lucide-react";
 const mandalaImage = "/images/mandala_gold.png";
 const brideGroomImage = "/images/10.png";
 
-function MandalaFrame() {
+type InviteImageProps = React.ComponentProps<"img"> & {
+  eager?: boolean;
+};
+
+function InviteImage({ eager = false, loading, decoding, ...props }: InviteImageProps) {
+  return (
+    <img
+      loading={loading ?? (eager ? "eager" : "lazy")}
+      decoding={decoding ?? "async"}
+      {...props}
+    />
+  );
+}
+
+function MandalaFrame({ minimal = false }: { minimal?: boolean }) {
   return (
     <div className="mandala-frame pointer-events-none fixed inset-0 z-[12] overflow-hidden" aria-hidden="true">
       <div className="mandala-corner mandala-corner-tr">
-        <img src={mandalaImage} alt="" className="mandala-art" />
+        <InviteImage src={mandalaImage} alt="" className="mandala-art" eager />
       </div>
-      <div className="mandala-corner mandala-corner-bl mandala-mobile-hidden">
-        <img src={mandalaImage} alt="" className="mandala-art" />
-      </div>
-      <div className="mandala-corner mandala-corner-tl is-soft mandala-mobile-hidden">
-        <img src={mandalaImage} alt="" className="mandala-art" />
-      </div>
-      <div className="mandala-corner mandala-corner-br is-soft mandala-mobile-hidden">
-        <img src={mandalaImage} alt="" className="mandala-art" />
-      </div>
+      {!minimal && (
+        <>
+          <div className="mandala-corner mandala-corner-bl mandala-mobile-hidden">
+            <InviteImage src={mandalaImage} alt="" className="mandala-art" />
+          </div>
+          <div className="mandala-corner mandala-corner-tl is-soft mandala-mobile-hidden">
+            <InviteImage src={mandalaImage} alt="" className="mandala-art" />
+          </div>
+          <div className="mandala-corner mandala-corner-br is-soft mandala-mobile-hidden">
+            <InviteImage src={mandalaImage} alt="" className="mandala-art" />
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
-function FloatingPetals() {
+function FloatingPetals({ disabled = false }: { disabled?: boolean }) {
   const [isLowPowerMode, setIsLowPowerMode] = useState(false);
   const [petals, setPetals] = useState<Array<{
     id: number;
@@ -45,6 +63,11 @@ function FloatingPetals() {
   }>>([]);
 
   useEffect(() => {
+    if (disabled) {
+      setPetals([]);
+      return;
+    }
+
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const isMobile = window.innerWidth < 768;
     setIsLowPowerMode(reduceMotion || isMobile);
@@ -68,7 +91,11 @@ function FloatingPetals() {
     }));
 
     setPetals(newPetals);
-  }, []);
+  }, [disabled]);
+
+  if (disabled) {
+    return null;
+  }
 
   return (
     <div className={`pointer-events-none fixed inset-0 overflow-hidden z-40 ${isLowPowerMode ? "opacity-70" : ""}`}>
@@ -147,7 +174,7 @@ function CountdownTimer() {
         >
           {/* Ornamental Frame container */}
           <div className="relative w-[4.5rem] h-[6.5rem] sm:w-20 sm:h-28 md:w-32 md:h-44 bg-white rounded-t-full shadow-[0_15px_35px_-10px_rgba(0,0,0,0.08)] border border-theme-100/60 flex flex-col items-center justify-center overflow-hidden transition-transform duration-700 group-hover:-translate-y-3">
-            <div className="absolute top-0 right-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')] w-full h-full pointer-events-none" />
+            <div className="absolute top-0 right-0 opacity-[0.03] paper-grain w-full h-full pointer-events-none" />
             <div className="absolute inset-1.5 sm:inset-2 md:inset-3 border-[0.5px] border-theme-300/50 rounded-t-full pointer-events-none" />
 
             {/* The Number */}
@@ -173,14 +200,46 @@ function CountdownTimer() {
 
 export default function WeddingInvitation() {
   const [isOpened, setIsOpened] = useState(false);
+  const [isLowPerformanceMode, setIsLowPerformanceMode] = useState(false);
+
+  useEffect(() => {
+    const motionMedia = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const connection = (navigator as Navigator & {
+      connection?: {
+        saveData?: boolean;
+        effectiveType?: string;
+        addEventListener?: (type: string, listener: () => void) => void;
+        removeEventListener?: (type: string, listener: () => void) => void;
+      };
+    }).connection;
+    const getDeviceMemory = () => (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+
+    const updatePerformanceMode = () => {
+      const constrainedNetwork = Boolean(connection?.saveData) || /2g/.test(connection?.effectiveType ?? "");
+      const lowMemory = typeof getDeviceMemory() === "number" && getDeviceMemory()! <= 4;
+      const smallScreen = window.innerWidth < 768;
+      setIsLowPerformanceMode(motionMedia.matches || constrainedNetwork || lowMemory || smallScreen);
+    };
+
+    updatePerformanceMode();
+    motionMedia.addEventListener("change", updatePerformanceMode);
+    window.addEventListener("resize", updatePerformanceMode);
+    connection?.addEventListener?.("change", updatePerformanceMode);
+
+    return () => {
+      motionMedia.removeEventListener("change", updatePerformanceMode);
+      window.removeEventListener("resize", updatePerformanceMode);
+      connection?.removeEventListener?.("change", updatePerformanceMode);
+    };
+  }, []);
 
   return (
     <main
-      className={`h-[100dvh] w-full bg-[#fdfaf5] transition-all duration-1000 ${isOpened ? "overflow-y-auto overflow-x-hidden" : "overflow-hidden flex items-center justify-center"
+      className={`h-[100dvh] w-full bg-[#fdfaf5] transition-all duration-1000 ${isOpened ? "overflow-y-auto overflow-x-hidden smooth-mobile-scroll" : "overflow-hidden flex items-center justify-center"
         } relative font-montserrat scroll-smooth`}
     >
-      <MandalaFrame />
-      <FloatingPetals />
+      <MandalaFrame minimal={isLowPerformanceMode} />
+      <FloatingPetals disabled={isLowPerformanceMode} />
 
       <AnimatePresence mode="wait">
         {!isOpened ? (
@@ -214,7 +273,7 @@ export default function WeddingInvitation() {
               <div className="absolute -inset-8 bg-[radial-gradient(circle,_rgba(243,167,205,0.35)_0%,_rgba(241,214,232,0.2)_45%,_transparent_75%)] blur-3xl opacity-90" />
               <div className="absolute inset-0 bg-gradient-to-b from-[#fffefb] via-[#fff9f2] to-[#fff6ee] rounded-[1.4rem] shadow-[0_28px_80px_-20px_rgba(82,38,66,0.35)] border border-theme-200/80 overflow-hidden" />
               <div className="absolute inset-[10px] rounded-[1.05rem] border border-theme-300/45 pointer-events-none" />
-              <div className="absolute inset-0 opacity-[0.07] bg-[url('https://www.transparenttextures.com/patterns/rice-paper-3.png')]" />
+              <div className="absolute inset-0 opacity-[0.07] paper-grain-strong" />
 
               <motion.div
                 initial={{ opacity: 0.15, x: -140 }}
@@ -232,17 +291,17 @@ export default function WeddingInvitation() {
                 whileHover={{ rotateY: -14 }}
                 transition={{ type: "spring", stiffness: 110, damping: 16 }}
               >
-                <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')]" />
+                <div className="absolute inset-0 opacity-20 paper-grain" />
                 <div className="absolute right-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-theme-200 via-theme-400 to-theme-200" />
                 <div className="absolute left-0 top-0 w-full h-full bg-gradient-to-tr from-black/25 via-transparent to-white/10" />
 
                 {/* Envelope Illustrations */}
-                <img
+                <InviteImage
                   src={mandalaImage}
                   className="absolute -top-20 md:-top-28 -left-20 md:-left-28 w-56 md:w-72 h-56 md:h-72 opacity-55 mix-blend-screen"
                   alt=""
                 />
-                <img
+                <InviteImage
                   src={mandalaImage}
                   className="absolute -bottom-20 md:-bottom-28 -left-20 md:-left-28 w-56 md:w-72 h-56 md:h-72 opacity-50 mix-blend-screen -rotate-90"
                   alt=""
@@ -259,17 +318,17 @@ export default function WeddingInvitation() {
                 whileHover={{ rotateY: 14 }}
                 transition={{ type: "spring", stiffness: 110, damping: 16 }}
               >
-                <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')]" />
+                <div className="absolute inset-0 opacity-20 paper-grain" />
                 <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-theme-200 via-theme-400 to-theme-200" />
                 <div className="absolute right-0 top-0 w-full h-full bg-gradient-to-tl from-black/25 via-transparent to-white/10" />
 
                 {/* Envelope Illustrations */}
-                <img
+                <InviteImage
                   src={mandalaImage}
                   className="absolute -top-20 md:-top-28 -right-20 md:-right-28 w-56 md:w-72 h-56 md:h-72 opacity-55 mix-blend-screen rotate-90"
                   alt=""
                 />
-                <img
+                <InviteImage
                   src={mandalaImage}
                   className="absolute -bottom-20 md:-bottom-28 -right-20 md:-right-28 w-56 md:w-72 h-56 md:h-72 opacity-50 mix-blend-screen rotate-180"
                   alt=""
@@ -293,7 +352,7 @@ export default function WeddingInvitation() {
 
               {/* Card Preview inside (Mandala) */}
               <div className="absolute inset-10 opacity-45 flex items-center justify-center z-10">
-                <img src={mandalaImage} alt="" className="w-full h-auto animate-spin-slow mix-blend-multiply" style={{ animationDuration: '24s' }} />
+                <InviteImage src={mandalaImage} alt="" className={`w-full h-auto mix-blend-multiply ${isLowPerformanceMode ? "" : "animate-spin-slow"}`} style={{ animationDuration: '24s' }} />
               </div>
 
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 text-[8px] uppercase tracking-[0.45em] text-theme-700/80 font-bold bg-white/70 backdrop-blur-md px-4 py-2 rounded-full border border-theme-200/80 shadow-sm">
@@ -327,7 +386,7 @@ export default function WeddingInvitation() {
             {/* Hero Section */}
             <section className="min-h-[100dvh] w-full flex items-center justify-center p-4 md:p-12 relative overflow-hidden bg-[#fdfaf5]">
               {/* Background texture */}
-              <div className="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')]" />
+              <div className="absolute inset-0 opacity-[0.03] paper-grain" />
 
               {/* Large Watermark Monogram */}
               <motion.div
@@ -438,15 +497,15 @@ export default function WeddingInvitation() {
             <section className="cv-auto py-24 md:py-32 w-full flex flex-col items-center px-4 relative">
               <div className="section-floral-overlay absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
                 {/* Top-left: left.png on mobile, mandala on desktop */}
-                <img src="/images/left.png" className="block md:hidden absolute -left-4 -top-4 w-[200px] h-auto opacity-80 object-contain" alt="" />
-                <img src={mandalaImage} className="hidden md:block absolute -left-10 top-8 w-[460px] h-auto mix-blend-multiply opacity-55 -rotate-[8deg]" alt="" />
+                <InviteImage src="/images/left.png" className="block md:hidden absolute -left-4 -top-4 w-[200px] h-auto opacity-80 object-contain" alt="" loading="eager" />
+                <InviteImage src={mandalaImage} className="hidden md:block absolute -left-10 top-8 w-[460px] h-auto mix-blend-multiply opacity-55 -rotate-[8deg]" alt="" />
                 {/* Top-right: mandala on desktop only */}
-                <img src={mandalaImage} className="hidden md:block absolute -right-10 top-2 w-[430px] h-auto mix-blend-multiply opacity-50 rotate-[12deg]" alt="" />
+                <InviteImage src={mandalaImage} className="hidden md:block absolute -right-10 top-2 w-[430px] h-auto mix-blend-multiply opacity-50 rotate-[12deg]" alt="" />
                 {/* Bottom-left: mandala on desktop only */}
-                <img src={mandalaImage} className="hidden md:block absolute -left-6 bottom-8 w-[420px] h-auto mix-blend-multiply opacity-40 rotate-[180deg]" alt="" />
+                <InviteImage src={mandalaImage} className="hidden md:block absolute -left-6 bottom-8 w-[420px] h-auto mix-blend-multiply opacity-40 rotate-[180deg]" alt="" />
                 {/* Bottom-right: right.png on mobile, mandala on desktop */}
-                <img src="/images/right.png" className="block md:hidden absolute -right-4 bottom-0 w-[200px] h-auto opacity-80 object-contain" alt="" />
-                <img src={mandalaImage} className="hidden md:block absolute -right-8 bottom-14 w-[470px] h-auto mix-blend-multiply opacity-45 -rotate-[170deg]" alt="" />
+                <InviteImage src="/images/right.png" className="block md:hidden absolute -right-4 bottom-0 w-[200px] h-auto opacity-80 object-contain" alt="" loading="eager" />
+                <InviteImage src={mandalaImage} className="hidden md:block absolute -right-8 bottom-14 w-[470px] h-auto mix-blend-multiply opacity-45 -rotate-[170deg]" alt="" />
               </div>
 
               <div className="max-w-[1000px] w-full flex flex-col items-center text-center relative z-10">
@@ -471,9 +530,10 @@ export default function WeddingInvitation() {
                 >
                   <div className="absolute -inset-3 md:-inset-4 rounded-[2rem] bg-theme-200/35 blur-xl" />
                   <div className="relative bg-white/90 p-2.5 md:p-3 rounded-[2rem] border border-theme-200 shadow-[0_20px_50px_-20px_rgba(131,63,105,0.45)]">
-                    <img
+                    <InviteImage
                       src={brideGroomImage}
                       alt="Bride and groom wedding illustration"
+                      loading="eager"
                       className="w-[200px] h-[240px] md:w-[270px] md:h-[320px] object-cover rounded-[1.6rem] border border-theme-100"
                     />
                   </div>
@@ -489,7 +549,7 @@ export default function WeddingInvitation() {
                     className="relative bg-white w-full max-w-[320px] p-6 md:p-10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] border border-theme-100/50 rounded-tl-[100px] rounded-br-[100px] md:rounded-tl-[130px] md:rounded-br-[130px] overflow-hidden group flex flex-col justify-center text-center items-center"
                   >
                     <div className="absolute inset-2 border border-theme-200/50 rounded-tl-[90px] rounded-br-[90px] md:rounded-tl-[120px] md:rounded-br-[120px] pointer-events-none" />
-                    <div className="absolute inset-0 opacity-[0.02] bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')] pointer-events-none" />
+                    <div className="absolute inset-0 opacity-[0.02] paper-grain pointer-events-none" />
                     <div className="relative z-10 space-y-4 py-8 md:py-12">
                       <div className="space-y-2">
                         <p className="text-[7px] md:text-[8px] uppercase tracking-[0.4em] font-bold text-stone-400">Beloved daughter of</p>
@@ -523,7 +583,7 @@ export default function WeddingInvitation() {
                     className="relative bg-white w-full max-w-[320px] p-6 md:p-10 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] border border-theme-100/50 rounded-tr-[100px] rounded-bl-[100px] md:rounded-tr-[130px] md:rounded-bl-[130px] overflow-hidden group flex flex-col justify-center text-center items-center md:mt-24"
                   >
                     <div className="absolute inset-2 border border-theme-200/50 rounded-tr-[90px] rounded-bl-[90px] md:rounded-tr-[120px] md:rounded-bl-[120px] pointer-events-none" />
-                    <div className="absolute inset-0 opacity-[0.02] bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')] pointer-events-none" />
+                    <div className="absolute inset-0 opacity-[0.02] paper-grain pointer-events-none" />
                     <div className="relative z-10 space-y-4 py-8 md:py-12">
                       <div className="space-y-2">
                         <p className="text-[7px] md:text-[8px] uppercase tracking-[0.4em] font-bold text-stone-400">Beloved son of</p>
@@ -588,7 +648,7 @@ export default function WeddingInvitation() {
             {/* Countdown Section */}
             <section className="cv-auto py-24 md:py-36 bg-[#fffcf5] relative border-y border-theme-100/30 flex flex-col items-center overflow-hidden">
               {/* Premium Background Elements */}
-              <div className="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')] pointer-events-none" />
+              <div className="absolute inset-0 opacity-[0.03] paper-grain pointer-events-none" />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[800px] aspect-square bg-theme-100 blur-[120px] rounded-full opacity-30 pointer-events-none" />
 
               <div className="w-full max-w-[1000px] px-4 flex flex-col items-center text-center relative z-10">
@@ -627,7 +687,7 @@ export default function WeddingInvitation() {
             {/* Venue Location Section */}
             <section className="cv-auto py-24 md:py-36 bg-[#fdfaf5] relative overflow-hidden">
               {/* Decorative Background */}
-              <div className="absolute inset-0 opacity-5 bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')] pointer-events-none" />
+              <div className="absolute inset-0 opacity-5 paper-grain pointer-events-none" />
               <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-theme-200 blur-[150px] rounded-full opacity-20 pointer-events-none" />
 
               <div className="container mx-auto px-6 max-w-6xl relative z-10">
@@ -714,7 +774,7 @@ export default function WeddingInvitation() {
             {/* RSVP Section */}
             <section className="cv-auto py-24 md:py-36 bg-[#2c2a26] text-white relative overflow-hidden flex flex-col items-center">
               {/* Opulent dark background */}
-              <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')] pointer-events-none" />
+              <div className="absolute inset-0 opacity-10 paper-grain pointer-events-none" />
               <div className="absolute top-0 right-0 w-[60vw] h-[60vw] max-w-[800px] bg-theme-800 blur-[150px] rounded-full opacity-30 pointer-events-none" />
               <div className="absolute bottom-0 left-0 w-[60vw] h-[60vw] max-w-[800px] bg-theme-900 blur-[150px] rounded-full opacity-40 pointer-events-none" />
 
@@ -793,11 +853,11 @@ export default function WeddingInvitation() {
 
             {/* Wishing Section and Footer Wrapper */}
             <div className="relative bg-[#fdfaf5]">
-              <div className="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')] pointer-events-none" />
+              <div className="absolute inset-0 opacity-[0.03] paper-grain pointer-events-none" />
 
               <section className="cv-auto py-24 md:py-36 relative flex flex-col items-center overflow-hidden">
-                <img src={mandalaImage} alt="" className="absolute top-0 right-0 w-[40vw] max-w-[500px] opacity-[0.04] mix-blend-multiply translate-x-1/3 -translate-y-1/3 pointer-events-none" />
-                <img src={mandalaImage} alt="" className="absolute bottom-16 left-1/2 w-[38vw] max-w-[360px] opacity-[0.08] mix-blend-multiply -translate-x-1/2 pointer-events-none" />
+                <InviteImage src={mandalaImage} alt="" className="absolute top-0 right-0 w-[40vw] max-w-[500px] opacity-[0.04] mix-blend-multiply translate-x-1/3 -translate-y-1/3 pointer-events-none" />
+                <InviteImage src={mandalaImage} alt="" className="absolute bottom-16 left-1/2 w-[38vw] max-w-[360px] opacity-[0.08] mix-blend-multiply -translate-x-1/2 pointer-events-none" />
 
                 <div className="container mx-auto px-4 max-w-4xl text-center relative z-10 w-full">
                   <motion.div
