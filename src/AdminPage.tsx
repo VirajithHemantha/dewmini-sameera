@@ -29,9 +29,7 @@ export default function AdminPage() {
     }
   };
 
-  const copyFullMessage = () => {
-    if (generatedLink) {
-      const message = `Dear ${prefix} ${guestName} ❤️
+  const fullMessage = generatedLink ? `Dear ${prefix ? prefix + ' ' : ''}${guestName.trim()} ❤️
 
 With joyful hearts, we warmly invite you to celebrate one of the most special days of our lives as we begin our journey together.
 
@@ -42,9 +40,11 @@ ${generatedLink}
 Your presence would truly mean the world to us, and we would be honored to celebrate this beautiful moment together.
 
 With love,
-❤️ Dewmini & Sameera`;
-      
-      navigator.clipboard.writeText(message);
+❤️ Dewmini & Sameera` : '';
+
+  const copyFullMessage = () => {
+    if (fullMessage) {
+      navigator.clipboard.writeText(fullMessage);
       alert('Full message copied to clipboard!');
     }
   };
@@ -103,8 +103,8 @@ With love,
               animate={{ opacity: 1, height: 'auto' }}
               className="pt-6 space-y-4"
             >
-              <div className="p-4 bg-stone-50 rounded-lg border border-stone-200 text-sm break-all font-mono text-stone-600">
-                {generatedLink}
+              <div className="p-4 bg-stone-50 rounded-lg border border-stone-200 text-sm whitespace-pre-wrap font-sans text-stone-600 max-h-64 overflow-y-auto">
+                {fullMessage}
               </div>
               <div className="flex gap-4">
                 <button 
